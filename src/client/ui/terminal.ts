@@ -48,7 +48,7 @@ export function openTerminalFor(): string | null {
   return current?.workerId ?? null;
 }
 
-export function openTerminal(net: Net, workerId: string, onChanges?: () => void, find?: TerminalFind) {
+export function openTerminal(net: Net, workerId: string, onChanges?: () => void, find?: TerminalFind, options?: { fontSize?: number }) {
   if (current?.workerId === workerId) {
     if (find) current.find(find);
     return current.modal;
@@ -75,7 +75,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
 
   const term = new Terminal({
     fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-    fontSize: 14,
+    fontSize: options?.fontSize ?? 14,
     lineHeight: 1.1,
     theme: TERM_THEME,
     cursorBlink: true,

@@ -42,7 +42,8 @@ These controls use existing modules, but the isolated test does not establish th
 | Voice and screen sharing | Original WebRTC; permission and secure context required; media transfer untested |
 | Search, bookshelf, notifications, budgets | Original modules; complete behavior not retested |
 | Dog and gong | Original protocol operations; no audiovisual parity claim |
-| Coffee, games, exterior, pictures, signs | Labeled route to original 3D |
+| Coffee | Original Caffeine model boosts Pixel walking speed |
+| Games, exterior, pictures, signs | Labeled route to original 3D |
 
 ## Usage and preview limits
 
@@ -50,7 +51,7 @@ The limits feed does not expose verified provider account identity or worker-to-
 
 Preview lists only services attributed to the selected worker. A browser on another computer needs the original service tunnel described in Services. There is no arbitrary URL proxy. HTTPS offices can encounter mixed-content restrictions for HTTP localhost services, and services can refuse framing. Detached Windows services without a discoverable ancestor are not attributed by guesswork.
 
-Procedural assets share one Canvas palette and scale. Furniture visibility is visual; interaction buttons remain accessible. Movement avoids furniture but does not implement character-to-character collision avoidance. Unsupported 3D interactions remain labeled.
+The current frontend uses reference-derived room art and a transparent character atlas, with live Canvas actors and accessible DOM controls. Furniture visibility is visual; interaction buttons remain accessible. Paths avoid furniture and worker positions; pixel projection separates overlapping peer sprites. Unsupported 3D interactions remain labeled. See pixel-visual-parity.md for the current visual verification.
 
 ## Validation
 
@@ -61,7 +62,7 @@ node --import tsx --test tests/pixel.test.ts
 node scripts/pixel-e2e.mjs
 ```
 
-Type checking and production build passed. Six Pixel unit checks and seventeen browser/protocol checks passed, with no browser page errors. The integration script creates temporary repositories and an isolated Office home; it requests no provider inference and uses no production credentials. Edge and free ports 4717/4817 are required. Screenshots and successful `results.json` go to the Git-ignored `verification/pixel/` directory.
+Type checking and production build passed. Six Pixel unit checks and the current twenty-four browser/protocol checks passed, with no browser page errors. The integration script creates temporary repositories and an isolated Office home; it requests no provider inference and uses no production credentials. Edge and free ports 4717/4817 are required. Screenshots and successful `results.json` go to the Git-ignored `verification/pixel/` directory.
 
 The full `npm test` attempt emitted 201 passing and 20 failing results, then retained open handles and was terminated. This is not a passing suite. An unmodified baseline reproduces the worker fixture timeout and a meeting assertion requiring Unix path separators. Other failures include provider executable fixtures. Baseline reproduction does not establish that every failure has the same cause. No full cross-platform suite pass is claimed.
 

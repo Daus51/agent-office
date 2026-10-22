@@ -9,7 +9,7 @@
 
 # 🏢 Agent Office
 
-**Pixel command center:** open `/pixel` for the interactive 2D office, `/lite` for a list view, or `/` for the original 3D office. [Pixel behavior and verification](docs/pixel-office-parity.md) records tested coverage and limitations. [Code layout](docs/code-layout.md) identifies the shared integration points.
+**Pixel command center:** open `/pixel` for the interactive 2D office, `/lite` for a list view, or `/` for the original 3D office. [Pixel behavior and verification](docs/pixel-office-parity.md) records tested coverage and limitations. [Code layout](docs/code-layout.md) identifies the shared integration points. [Visual verification](docs/pixel-visual-parity.md) records the reference comparison.
 
 **A 3D office your team shares with its coding agents.**
 

@@ -46,7 +46,7 @@ export function readAppearance(raw: string | null): Appearance {
   } catch { /* Invalid browser preferences use defaults. */ }
   return value;
 }
-export const MAP = { width: 1024, height: 640, cell: 16 };
+export const MAP = { width: 1400, height: 455, cell: 16 };
 export function inside(p: Point, r: Rect, pad = 0): boolean {
   return p.x >= r.x - pad && p.x <= r.x + r.w + pad && p.y >= r.y - pad && p.y <= r.y + r.h + pad;
 }

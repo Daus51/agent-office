@@ -8,6 +8,7 @@ if (destination !== '/') {
   document.title = 'Sign in · Pixel Agent Office';
   const heading = document.querySelector('h1');
   if (heading) heading.textContent = 'Pixel Agent Office';
+  void import('./pixel/login-design').then(module => module.designPixelLogin());
 }
 
 const form = document.getElementById('form') as HTMLFormElement;
@@ -42,7 +43,7 @@ void fetch('/api/login', { cache: 'no-store' })
     nameRow.hidden = false;
     nameInput.required = !shared;
     nameNote.hidden = !shared;
-    sub.textContent = shared ? 'Knock knock. Who is it?' : 'Knock knock. Who is it? Sign in with your own account.';
+    sub.textContent = destination !== '/' ? "Sign in to your team's shared office" : shared ? 'Knock knock. Who is it?' : 'Knock knock. Who is it? Sign in with your own account.';
     try {
       nameInput.value = localStorage.getItem(NAME_KEY) ?? '';
     } catch {

@@ -7,10 +7,12 @@ The three document entry points share the Office backend. Vite builds `index.htm
 | `src/client/main.ts`, `world/` | Original 3D frontend and interactions |
 | `src/client/pixel/main.ts` | Pixel and Lite navigation, shared workflow entry points |
 | `src/client/pixel/adapter.ts` | Original Net connection, Store updates, shared modal message routing |
-| `src/client/pixel/scene.ts` | Canvas furniture and sprites, DOM interaction targets, movement |
+| `src/client/pixel/scene.ts` | Reference room art, live Canvas sprites, DOM interaction targets, movement |
 | `src/client/pixel/model.ts` | Appearance validation, quota display rules, obstacle pathfinding |
 | `src/client/pixel/workspace.ts` | Explicit agent terminal selection and opt-in service preview |
-| `src/client/pixel/panels.ts` | Usage feed presentation and browser appearance preferences |
+| `src/client/pixel/panels.ts` | Usage feed presentation, unmetered model display policy, appearance preferences |
+| `src/client/pixel/login-design.ts` | Existing login form presentation and validated invitation navigation |
+| `src/client/public/assets/pixel/` | Public static room art, character atlas, login art and robot mark |
 | `src/client/ui/` | Shared terminals, boards, queue, meetings, Excalidraw, settings, accounts, sign-ins |
 | `src/client/net.ts`, `state.ts` | Existing WebSocket transport and authoritative client store |
 | `src/shared/protocol.ts` | Unchanged Office message contracts |

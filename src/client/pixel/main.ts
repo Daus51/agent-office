@@ -4,7 +4,7 @@ import { DESKS, STATIONS, STATION_AGENT, nextFreeSeat } from '../../shared/layou
 import { randomLook } from '../../shared/avatar';
 import type { WorkerInfo } from '../../shared/protocol';
 import { store, loadProfile, saveProfile, loadSettings, saveSettings } from '../state';
-import { h, openModal, closeAllModals, toast, STATUS_LABEL } from '../ui/dom';
+import { h, openModal, closeAllModals, onModalChange, toast, STATUS_LABEL } from '../ui/dom';
 import { openPrompt, sendHomeDialog, confirmDialog } from '../ui/prompt';
 import { openAsk } from '../ui/ask';
 import { openBoard, type BoardActions } from '../ui/boards';
@@ -65,6 +65,8 @@ const iconPaths: Record<string, string> = {
   usage: 'M4 20V10M10 20V4M16 20v-7M22 20V7',
   team: 'M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 21v-4c0-5 11-5 11 0v4M13 13c5-1 9 0 9 4v4',
   settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2',
+  search: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14M15 15l7 7',
+  bell: 'M6 10c0-8 12-8 12 0v5l3 3H3l3-3zM9 21h6',
 };
 function icon(name: string) { const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); const path = document.createElementNS(svg.namespaceURI, 'path'); path.setAttribute('d', iconPaths[name] ?? iconPaths.office); path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.6'); path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg; }
 let scene: PixelScene | undefined;
@@ -111,14 +113,20 @@ const boardActions: BoardActions = {
 function originalSettings() { openSettings(net, settings, next => { settings = next; saveSettings(settings); }, () => openCharacter(false, p => { net.send({ t: 'profile', ...p }); }), () => {}, notifier, () => void logout()); }
 async function logout() { voice.leaveVoice(); voice.stopShare(); await fetch('/api/logout', { method: 'POST' }); location.assign('/login?next=/pixel'); }
 function team() {
-  const body = h('div.pixel-team-grid');
+  const content = h('div.pixel-team-content');
   const render = () => {
-    body.replaceChildren(h('p.note', {}, 'Human team members. AI workers are shown separately in Agents.'), ...[...store.peers.values()].map(p => h('div.pixel-person-row', {}, h('span.pixel-face', { style: `--person:${p.color}` }, p.name.slice(0, 2).toUpperCase()), h('div', {}, h('strong', {}, p.name), h('small', {}, `${p.id === store.you ? 'You · ' : ''}${store.floors.find(f => f.id === p.floor)?.name ?? 'Lobby'}`)))));
+    const rows = store.me.admin && store.accounts ? store.accounts.accounts.map(a => ({ name: a.name, role: a.role, online: a.online, identity: 'Email not reported' })) : [...store.peers.values()].map(p => ({ name: p.name, role: p.id === store.you ? store.me.account?.role ?? 'admin' : 'Not reported', online: true, identity: 'Email not reported' }));
+    const table = h('table.pixel-team-table', {}, h('thead', {}, h('tr', {}, ...['Name', 'Role', 'Status', 'Actions'].map(label => h('th', { scope: 'col' }, label)))), h('tbody', {}, ...rows.map(person => h('tr', {}, h('td', {}, h('div.pixel-team-person', {}, h('span.pixel-human-avatar', { 'aria-hidden': 'true' }), h('span', {}, h('strong', {}, person.name), h('small', {}, person.identity)))), h('td', {}, h('span.role', { class: person.role }, person.role)), h('td', {}, h('span.pixel-presence', { class: person.online ? '' : 'offline' }, h('i.pixel-live-dot'), person.online ? 'Online' : 'Offline')), h('td', {}, store.me.admin ? button('Manage', () => openAccounts(net)) : h('span', {}, '—'))))));
+    content.replaceChildren(h('div.pixel-team-heading', {}, h('div', {}, h('h3', {}, 'Users'), h('p', {}, 'Manage team members and their access')), store.me.admin ? button('+ Invite User', () => openAccounts(net), 'primary') : h('span', {}, 'Member access')), table);
+    if (!rows.length) content.append(h('p.note', {}, store.me.admin ? store.accounts ? 'No individual accounts yet. Use Invite User to create one.' : 'Loading account records…' : 'No connected users reported.'));
+    if (store.me.admin) content.append(h('p.note', {}, 'Account permissions and invitation links are enforced by the original Office server.'));
   };
-  const unsub = store.on('peers', render);
-  const modal = openModal(h('div.modal.pixel-panel', { role: 'dialog', 'aria-label': 'Team Management' }, h('header', {}, h('h2', {}, 'Team Management')), h('div.body', {}, body), h('footer', {}, store.me.admin ? button('Accounts & invitations', () => openAccounts(net)) : h('p.note', {}, 'Only an administrator can manage accounts.'), button('Connection invitations', () => openTeam(net)), button('Your provider sign-ins', () => openSignIns(net)))), { onClose: unsub });
-  render(); return modal;
+  const nav = h('nav.pixel-panel-nav', { 'aria-label': 'Team settings' }, button('Profile', profile), button('Users', render, 'active'), button('Projects', floors), button('Usage & Limits', () => openUsage(net, prefs, saveAppearance)), button('Appearance', () => openAppearance(prefs, saveAppearance, originalSettings)), button('Provider sign-ins', () => openSignIns(net)));
+  const unsub = [store.on('peers', render), store.on('accounts', render), store.on('me', render)];
+  const modal = openModal(h('div.modal.pixel-team-panel', { role: 'dialog', 'aria-label': 'Team Management' }, h('header', {}, h('h2', {}, 'Team Management')), h('div.pixel-team-layout', {}, nav, content), h('footer', {}, button('Connection invitations', () => openTeam(net)), button('Your provider sign-ins', () => openSignIns(net)))), { onClose: () => unsub.forEach(off => off()) });
+  if (store.me.admin) net.send({ t: 'accounts.get' }); render(); return modal;
 }
+
 function agents() {
   const list = h('div.pixel-agent-list');
   const render = () => list.replaceChildren(...[...store.workers.values()].map(w => button(`${w.name} · ${providerLabel(w.provider, store.project)} · ${STATUS_LABEL[w.status]}`, () => { closeAllModals(); workspace.open(w.id); })), button('Hire another agent', () => hire()));
@@ -126,13 +134,22 @@ function agents() {
 }
 function show3D(feature: string) { overlay(feature, h('div', {}, h('p', {}, `${feature} remains available in the original 3D office. Your workers and projects stay in place when you switch views.`), h('a.pixel-button', { href: '/' }, 'Open 3D office'))); }
 function screenSharing() {
-  const body = h('div');
+  const body = h('div.body'), controls = h('div', { style: 'display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap' });
+  const log = h('div.pixel-chat-history', { role: 'log', 'aria-live': 'polite' });
+  const input = h('input.pixel-chat-input', { 'aria-label': 'Message your team', placeholder: 'Message your team…', maxlength: 500 });
+  const media = h('div');
+  const renderChat = () => { log.replaceChildren(...store.chat.slice(-30).map(line => h('p', {}, h('strong', {}, `${line.name} `), line.text))); log.scrollTop = log.scrollHeight; };
+  input.onkeydown = event => { if (event.key === 'Enter' && input.value.trim()) { net.send({ t: 'chat', text: input.value.trim() }); input.value = ''; } };
   const refresh = () => {
-    body.replaceChildren(h('p.note', {}, 'Uses the original Office voice, screen-sharing, and WebRTC connections. A browser permission is required when you choose to share.'), button(voice.sharing ? 'Stop sharing' : 'Share your screen', () => { if (voice.sharing) { voice.stopShare(); refresh(); } else void voice.startShare().then(error => { if (error) toast(error, 'warn'); refresh(); }); }), button(voice.inVoice ? 'Leave voice' : 'Join voice', () => { if (voice.inVoice) { voice.leaveVoice(); refresh(); } else void voice.joinVoice().then(error => { if (error) toast(error, 'warn'); refresh(); }); }));
-    for (const [id, stream] of voice.remoteScreens()) { const video = h('video', { autoplay: true, controls: true, playsinline: true, 'aria-label': `${store.peers.get(id)?.name ?? 'Team member'} screen` }); video.srcObject = stream; body.append(video); }
+    controls.replaceChildren(button(voice.inVoice ? 'Leave voice' : 'Join voice', () => { if (voice.inVoice) { voice.leaveVoice(); refresh(); } else void voice.joinVoice().then(error => { if (error) toast(error, 'warn'); refresh(); }); }), button(voice.sharing ? 'Stop sharing' : 'Share screen', () => { if (voice.sharing) { voice.stopShare(); refresh(); } else void voice.startShare().then(error => { if (error) toast(error, 'warn'); refresh(); }); }));
+    media.replaceChildren();
+    for (const [id, stream] of voice.remoteScreens()) { const video = h('video', { autoplay: true, controls: true, playsinline: true, 'aria-label': `${store.peers.get(id)?.name ?? 'Team member'} screen`, style: 'max-width:100%' }); video.srcObject = stream; media.append(video); }
   };
-  overlay('Lounge TV · Screen sharing', body); refresh();
+  body.append(controls, log, input, h('p.note', { style: 'margin-top:10px' }, 'Voice and screen sharing use the original Office connections. Capture requires browser permission and a secure context.'), media);
+  const off = store.on('chat', renderChat);
+  openModal(h('div.modal.pixel-panel', { role: 'dialog', 'aria-label': 'Team Lounge' }, h('header', {}, h('h2', {}, 'Team Lounge · Chat & Voice')), body), { onClose: off }); renderChat(); refresh();
 }
+
 function object(id: OfficeAction) {
   only(() => {
     if (id === 'queue') openQueue(net, { openTerminal: focusWorker });
@@ -145,49 +162,78 @@ function object(id: OfficeAction) {
     else if (id === 'dog') { net.send({ t: 'dog.pet' }); toast(`You pet ${store.dog?.name ?? 'the office dog'}`); }
     else if (id === 'gong') net.send({ t: 'gong' });
     else if (id === 'screen') screenSharing();
+    else if (id === 'coffee') { const cups = scene?.coffee(); toast(`Coffee ready${cups ? ` · cup ${cups}` : ''}. Walking is quicker for a minute.`); }
     else if (id.startsWith('station-')) {
       const station = STATIONS.find(s => s.id === id)!; const who = STATION_AGENT[station.station!].name;
       openPrompt({ title: `Ask ${who}`, subtitle: 'This uses the original board-agent workflow. Select its character afterward to open its terminal.', onSubmit: prompt => net.send({ t: 'station.prompt', deskId: station.id, prompt }) });
-    } else show3D(id === 'coffee' ? 'Coffee, movement boosts, and lounge interactions' : id === 'pictures' ? 'Wall pictures and decorations' : id === 'signs' ? 'Desk signs' : 'Original worlds and office expansion');
+    } else show3D(id === 'pictures' ? 'Wall pictures and decorations' : id === 'signs' ? 'Desk signs' : 'Original worlds and office expansion');
   });
 }
 
-const logo = h('a.pixel-brand', { href: lite ? '/lite' : '/pixel' }, h('span.pixel-brand-mark', { 'aria-hidden': 'true' }, 'P'), h('span', {}, 'pixel', h('b', {}, 'office'), h('small', {}, 'AGENT COMMAND CENTER')));
-const navItems: [string, string, () => void][] = [
-  ['office', 'Office Dashboard', () => { closeAllModals(); workspace.close(); sidebar.querySelectorAll('.active').forEach(e => e.classList.remove('active')); }],
-  ['floors', 'Projects', floors], ['floors', 'Floors', floors], ['queue', 'Tasks / Queue', () => object('queue')], ['agents', 'Agents', agents],
-  ['github', 'GitHub', () => object('issues')], ['meeting', 'Meetings', () => object('meeting')], ['whiteboard', 'Whiteboard', () => object('whiteboard')],
+const logo = h('a.pixel-brand', { href: lite ? '/lite' : '/pixel' }, h('img', { src: '/assets/pixel/office-bot.svg', alt: '' }), h('span', {}, h('strong', {}, 'PIXEL AGENT OFFICE'), h('small', {}, 'COMMAND CENTER')));
+const navItems: [string, string, () => void, string?][] = [
+  ['office', 'Office', () => { closeAllModals(); workspace.close(); }, 'office'],
+  ['queue', 'Tasks', () => object('queue'), 'queue'], ['agents', 'Agents', agents], ['floors', 'Projects', floors],
+  ['github', 'GitHub', () => object('issues')], ['queue', 'Issues', () => object('issues'), 'sub'], ['queue', 'Pull Requests', () => object('pulls'), 'sub'],
+  ['meeting', 'Meetings', () => object('meeting')], ['whiteboard', 'Whiteboard', () => object('whiteboard')],
+  ['office', 'Services', () => object('services')], ['whiteboard', 'Documentation', () => object('docs')],
   ['usage', 'Usage & Limits', () => openUsage(net, prefs, saveAppearance)], ['team', 'Team', team], ['settings', 'Settings', () => openAppearance(prefs, saveAppearance, originalSettings)],
 ];
 const nav = h('nav.pixel-nav');
-navItems.forEach(([name, label, action], index) => { const b = button(label, () => { sidebar.querySelectorAll('.active').forEach(e => e.classList.remove('active')); b.classList.add('active'); only(action); }, index === 0 ? 'active' : ''); b.prepend(icon(name)); nav.append(b); });
-const sidebarInfo = h('div.pixel-sidebar-info', {}, h('span.pixel-eyebrow', {}, 'ONE OFFICE. EVERY VIEW.'), h('p', {}, 'Real agents. Shared context. Room to do your best work.'), button('All original features ↗', () => show3D('Original 3D features')));
-sidebar.append(logo, h('div.pixel-nav-heading', {}, 'WORKSPACE'), nav, sidebarInfo, h('div.pixel-sidebar-footer', {}, h('span.pixel-face', { style: `--person:${store.profile.color}` }, store.profile.name.slice(0, 2)), h('span', {}, store.profile.name, h('small', {}, 'Your workspace')), button('⋯', () => profile())));
+navItems.forEach(([name, label, action, kind], index) => {
+  const b = button(label, () => { only(action); sidebar.querySelectorAll('.active').forEach(el => el.classList.remove('active')); b.classList.add('active'); shell.classList.remove('sidebar-collapsed'); }, `${index === 0 ? 'active' : ''} ${kind === 'sub' ? 'pixel-subnav' : ''}`);
+  b.dataset.navigation = label; b.prepend(icon(name));
+  if (kind === 'queue') b.append(h('span.pixel-nav-count', { 'data-queue-count': '' }));
+  nav.append(b);
+});
+sidebar.append(nav, h('div.pixel-sidebar-footer', {}, button('Explore 3D ↗', () => show3D('All original Office spaces'))));
 function profile() { overlay('Your profile', h('div', {}, h('p', {}, store.me.account ? `${store.me.account.name} · ${store.me.account.role}` : 'Shared-password administrator session'), button('Edit character', () => openCharacter(false, p => net.send({ t: 'profile', ...p }))), button('Provider sign-ins', () => openSignIns(net)), button('Original settings', originalSettings), button('Sign out', () => void logout()))); }
 const views = h('nav.pixel-view-switch', { 'aria-label': 'Interface view' }, ...[['/', '3D'], ['/pixel', 'Pixel'], ['/lite', 'Lite']].map(([url, label]) => h('a', { href: url, 'aria-current': (lite ? url === '/lite' : url === '/pixel') ? 'page' : null }, label)));
-const collapse = button('☰', () => shell.classList.toggle('sidebar-collapsed')); collapse.setAttribute('aria-label', 'Toggle navigation');
-top.append(collapse, h('div.pixel-project-nav', {}, button('‹', () => stepFloor(-1)), projectSelect, button('›', () => stepFloor(1))), views, button('Search  ⌘K', () => only(() => openSearch(focusWorker)), 'pixel-search-button'), h('span.pixel-top-spacer'), people, button('Usage', () => only(() => openUsage(net, prefs, saveAppearance))), button('Day / Night', () => { prefs.mode = isNight(prefs.mode) ? 'day' : 'night'; saveAppearance(); }), button('Settings', () => only(() => openAppearance(prefs, saveAppearance, originalSettings))), button('Profile', profile));
-top.querySelector('.pixel-project-nav button')?.setAttribute('aria-label', 'Previous floor'); top.querySelectorAll('.pixel-project-nav button')[1]?.setAttribute('aria-label', 'Next floor');
-const welcome = h('div.pixel-welcome', {}, h('div', {}, h('span.pixel-eyebrow', {}, lite ? 'THE LIGHTWEIGHT WORKSPACE' : 'YOUR TEAM, IN ONE PLACE'), title, floorNote), h('div.pixel-welcome-actions', {}, button('Notifications', () => { const list = h('div', {}, ...store.floors.filter(f => f.waiting).map(f => button(`${f.name} · ${f.waiting} need attention`, () => net.send({ t: 'floor.go', floor: f.id })))); if (!list.children.length) list.append(h('p', {}, 'No floors report agents needing attention.')); overlay('Notifications', list); }), button('+ Hire agent', () => only(() => hire()), 'primary')));
-const sceneBar = h('div.pixel-scene-bar', {}, h('div', {}, h('span.pixel-live-dot'), h('b', {}, lite ? 'Agent workspace' : 'The office'), connection), workerCounts);
-const sceneBottom = h('div.pixel-scene-bottom', {}, h('span', {}, lite ? 'Select an agent to open their real workspace.' : 'Click objects to interact · Drag to pan · Scroll to zoom'), h('div', {}, button('−', () => scene?.zoomBy(.85)), button('Fit', () => scene?.reset()), button('+', () => scene?.zoomBy(1.15))));
+const collapse = button('☰', () => shell.classList.toggle('sidebar-collapsed'), 'pixel-menu-toggle'); collapse.setAttribute('aria-label', 'Toggle navigation');
+const projectName = h('strong', {}, 'Connecting…');
+const projectPicker = button('', floors, 'pixel-project-picker'); projectPicker.setAttribute('aria-label', 'Choose project'); projectPicker.append(h('span', {}, h('small', {}, 'Project'), projectName), h('span', {}, '⌄'));
+const floorNumber = h('small', {}, 'Floor');
+const floorControl = h('div.pixel-floor-picker', {}, button('‹', () => stepFloor(-1)), h('label', {}, floorNumber, projectSelect), button('›', () => stepFloor(1)));
+floorControl.querySelector('button')!.setAttribute('aria-label', 'Previous floor'); floorControl.querySelectorAll('button')[1].setAttribute('aria-label', 'Next floor');
+const searchButton = button('', () => only(() => openSearch(focusWorker)), 'pixel-search-button'); searchButton.append(icon('search'), h('span', {}, 'Search agents, tasks, files…'), h('kbd', {}, 'Ctrl+K')); searchButton.setAttribute('aria-label', 'Search agents, tasks, files');
+const notifications = button('', () => only(() => {
+  const list = h('div.pixel-alert-list', {}, ...[...store.workers.values()].filter(w => w.status === 'needs_input' || (w.status === 'done' && !w.acked)).map(w => button(`${w.name} · ${STATUS_LABEL[w.status]}`, () => focusWorker(w.id))));
+  if (!list.children.length) list.append(h('p', {}, 'No agents need your attention.')); overlay('Notifications', list);
+}), 'pixel-notifications'); notifications.setAttribute('aria-label', 'Notifications'); notifications.append(icon('bell'), h('span.pixel-alert-count'));
+const lighting = button('', () => { prefs.mode = isNight(prefs.mode) ? 'day' : 'night'; saveAppearance(); }, 'pixel-lighting'); lighting.setAttribute('aria-label', 'Day / Night'); lighting.append(h('span', {}, '☀'), h('span', {}, 'Day / Night'));
+const profileName = h('strong', {}, store.profile.name), profileRole = h('small', {}, 'Admin');
+const profileButton = button('', profile, 'pixel-profile-button'); profileButton.setAttribute('aria-label', 'Profile'); profileButton.append(h('span.pixel-human-avatar'), h('span', {}, profileName, profileRole), h('span', {}, '⌄'));
+const usageButton = button('Usage', () => only(() => openUsage(net, prefs, saveAppearance)), 'pixel-usage-button'); usageButton.prepend(h('i.pixel-live-dot'));
+const onlineLabel = h('span.pixel-online-count');
+top.append(logo, connection, collapse, projectPicker, floorControl, views, searchButton, h('div.pixel-online', {}, people, onlineLabel), usageButton, notifications, lighting, profileButton);
+const sceneBar = h('div.pixel-scene-bar', {}, h('span', {}, 'Connection lost · reconnecting'), workerCounts);
+const helpButton = button('?', () => onboard(true)); helpButton.setAttribute('aria-label', 'Office help');
+const sceneBottom = h('div.pixel-scene-controls', {}, button('−', () => scene?.zoomBy(.85)), button('Fit', () => scene?.reset()), button('+', () => scene?.zoomBy(1.15)), helpButton);
+sceneBottom.setAttribute('aria-label', 'Office view controls');
 sceneHost.append(sceneBar);
 if (lite) sceneHost.append(workerList); else { scene = new PixelScene(() => prefs, object, id => workspace.open(id), hire, move); sceneHost.append(scene.element); }
 sceneHost.append(sceneBottom);
-const bottom = h('section.pixel-bottom-grid', {}, h('section.pixel-activity-card', {}, h('header', {}, h('h2', {}, 'Office pulse'), h('span', {}, 'LIVE')), activity), h('section.pixel-team-card', {}, h('header', {}, h('h2', {}, 'Team conversation'), button('Team', () => only(team))), chatMessages, chatInput));
-main.append(top, h('div.pixel-page', {}, welcome, sceneHost, bottom), h('footer.pixel-statusbar', {}, h('span', {}, 'AGENT OFFICE / PIXEL'), clock, button('Restore selected workspace', () => workspace.restore())));
+const liteHeader = h('div.pixel-lite-heading', {}, title, floorNote);
+const page = h('div.pixel-page', {}, ...(lite ? [liteHeader] : []), sceneHost);
+main.append(top, page, h('footer.pixel-statusbar', {}, clock, button('Restore selected workspace', () => workspace.restore())));
 shell.append(sidebar, main); document.getElementById('pixel-root')!.append(shell);
+onModalChange(open => { if (!open) { sidebar.querySelectorAll('.active').forEach(el => el.classList.remove('active')); sidebar.querySelector('[data-navigation="Office"]')?.classList.add('active'); scene?.select(null); } });
 
-function move(at: Point) { const x = Math.max(-17, Math.min(17, (at.x - 70) / 23 - 18)), z = Math.max(-12, Math.min(12, (at.y - 80) / 17 - 13)); net.send({ t: 'move', x, y: 0, z, rotY: 0, moving: false }); }
+function move(at: Point) { const x = Math.max(-17, Math.min(17, (at.x - 120) / 32 - 18)), z = Math.max(-12, Math.min(12, (at.y - 190) / 8 - 13)); net.send({ t: 'move', x, y: 0, z, rotY: 0, moving: false }); }
 function render() {
-  const profileName = sidebar.querySelector('.pixel-sidebar-footer > span:nth-child(2)');
-  if (profileName) profileName.replaceChildren(document.createTextNode(store.profile.name), h('small', {}, 'Your workspace'));
-  const face = sidebar.querySelector<HTMLElement>('.pixel-sidebar-footer .pixel-face');
-  if (face) { face.textContent = store.profile.name.slice(0, 2).toUpperCase(); face.style.setProperty('--person', store.profile.color); }
+  profileName.textContent = store.me.account?.name ?? store.profile.name;
+  profileRole.textContent = store.me.account?.role ?? 'Admin';
+  projectName.textContent = store.project?.name ?? 'Choose project';
+  const floorIndex = store.floors.findIndex(f => f.id === store.floor);
+  floorNumber.textContent = floorIndex >= 0 ? `Floor ${floorIndex + 1}` : 'Floor';
+  onlineLabel.textContent = `${store.peers.size} online`;
+  sidebar.querySelector('[data-queue-count]')!.textContent = String(store.queue.tasks.filter(t => t.status === 'queued').length);
   title.textContent = store.project ? `${store.project.name}, in focus.` : 'Your office, in focus.';
   floorNote.textContent = store.project ? `${store.currentFloor()?.repo ?? store.project.dir}  /  ${store.project.branch ?? 'No branch reported'}` : 'Choose a project in the elevator to get started.';
-  const existingValue = projectSelect.value; projectSelect.replaceChildren(...store.floors.filter(f => !f.cloning).map((f, i) => h('option', { value: f.id }, `${String(i + 1).padStart(2, '0')} / ${f.name}${f.waiting ? ` · ${f.waiting} waiting` : ''}`))); projectSelect.value = store.floor ?? existingValue;
+  const existingValue = projectSelect.value; projectSelect.replaceChildren(...store.floors.filter(f => !f.cloning).map(f => h('option', { value: f.id }, `${f.name}${f.waiting ? ` · ${f.waiting} waiting` : ''}`))); projectSelect.value = store.floor ?? existingValue;
   const workers = [...store.workers.values()]; const busy = workers.filter(w => w.status === 'working' || w.status === 'starting').length, waiting = workers.filter(w => w.status === 'needs_input').length;
+  const attention = workers.filter(w => w.status === 'needs_input' || (w.status === 'done' && !w.acked)).length;
+  const alertCount = notifications.querySelector<HTMLElement>('.pixel-alert-count')!; alertCount.textContent = attention ? String(attention) : ''; alertCount.hidden = !attention;
   workerCounts.replaceChildren(h('span', {}, `${workers.length} agents`), h('span', { class: 'working' }, `${busy} working`), h('span', { class: 'waiting' }, `${waiting} need input`));
   people.replaceChildren(...[...store.peers.values()].slice(0, 4).map(p => h('button.pixel-face', { type: 'button', title: `${p.name} · human`, 'aria-label': `Team member ${p.name}`, style: `--person:${p.color}`, onclick: team }, p.name.slice(0, 2).toUpperCase())));
   scene?.sync();
@@ -203,9 +249,9 @@ store.on('chat', () => { chatMessages.replaceChildren(...store.chat.slice(-3).ma
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && chatInput.value.trim()) { net.send({ t: 'chat', text: chatInput.value.trim() }); chatInput.value = ''; } });
 window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); only(() => openSearch(focusWorker)); } });
 const updateClock = () => { clock.textContent = new Date().toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }); if (prefs.mode === 'auto') applyAppearance(); }; updateClock(); setInterval(updateClock, 60_000);
-function onboard() {
-  let seen = false; try { seen = localStorage.getItem('agent-office.pixel.onboarded') === '1'; } catch { /* optional onboarding */ }
-  if (seen) return;
+function onboard(show = false) {
+  if (!show) return;
+  main.querySelector('.pixel-onboarding')?.remove();
   const dismiss = () => { try { localStorage.setItem('agent-office.pixel.onboarded', '1'); } catch { /* optional preference */ } card.remove(); };
   const card = h('aside.pixel-onboarding', { role: 'region', 'aria-label': 'Pixel Office tips' }, h('b', {}, 'Welcome to your Pixel Office'), h('p', {}, 'Select an agent for their terminal. Boards, the meeting room, whiteboard, and elevator open the real Office workflows. Usage and Team are in the navigation.'), button('Got it', dismiss)); main.append(card);
 }
