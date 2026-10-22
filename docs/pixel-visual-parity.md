@@ -40,4 +40,4 @@ Live external GitHub mutations, media transfer, and complete model-driven meetin
 
 ## Live release check
 
-The frontend assets were updated on the existing PC2 Office without restarting its backend. A read-only browser check recorded no page errors and confirmed that worker `9256b66b99b5` retained its session and done status after opening/closing the workspace and reloading Pixel. A real terminal snapshot and actual Pro limits were received. No new model task was submitted by this check. The capture is recorded in `verification/pixel-redesign-live/result.json`.
+Frontend asset deployment does not require a backend restart. The existing Office was separately found stopped during final validation, and its scheduled launcher was started again. A read-only browser check recorded no page errors and confirmed that worker `9256b66b99b5` retained its saved session after opening/closing the workspace and reloading Pixel; its final reported status was idle. A real terminal snapshot and actual Pro limits were received. No new model task was submitted by this check. The capture is recorded in `verification/pixel-redesign-live/result.json`.
