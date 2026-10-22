@@ -1,5 +1,15 @@
 export {}; // a module, so its names don't clash with the other pages' scripts
 
+const requested = new URLSearchParams(location.search).get('next');
+const destination = requested === '/' || requested === '/lite' ? requested : '/pixel';
+if (destination !== '/') {
+  document.body.classList.add('pixel-login');
+  void import('./pixel/pixel.css');
+  document.title = 'Sign in · Pixel Agent Office';
+  const heading = document.querySelector('h1');
+  if (heading) heading.textContent = 'Pixel Agent Office';
+}
+
 const form = document.getElementById('form') as HTMLFormElement;
 const nameRow = document.getElementById('name-row') as HTMLLabelElement;
 const nameInput = document.getElementById('name') as HTMLInputElement;
@@ -15,10 +25,10 @@ const NAME_KEY = 'agent-office.login-name';
 // address bar and trade it for a session. The key is after the #, so it never reaches a server log.
 const linkKey = new URLSearchParams(location.hash.slice(1)).get('key');
 if (linkKey) {
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', location.pathname + location.search);
   void fetch('/api/link', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: linkKey }) })
     .then(async (res) => {
-      if (res.ok) return location.replace('/');
+      if (res.ok) return location.replace(destination);
       error.textContent = ((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Could not sign in';
     })
     .catch(() => void (error.textContent = 'Server unreachable'));
@@ -59,7 +69,7 @@ form.addEventListener('submit', async (e) => {
       } catch {
         // storage blocked
       }
-      location.href = '/';
+      location.href = destination;
       return;
     }
     const body = await res.json().catch(() => ({}));

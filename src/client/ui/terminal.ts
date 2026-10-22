@@ -51,7 +51,7 @@ export function openTerminalFor(): string | null {
 export function openTerminal(net: Net, workerId: string, onChanges?: () => void, find?: TerminalFind) {
   if (current?.workerId === workerId) {
     if (find) current.find(find);
-    return;
+    return current.modal;
   }
   current?.modal.close();
   const info = store.workers.get(workerId);
@@ -307,4 +307,5 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   refresh();
   net.send({ t: 'worker.attach', workerId });
   setTimeout(() => term.focus(), 50);
+  return modal;
 }

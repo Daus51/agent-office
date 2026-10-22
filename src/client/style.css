@@ -1,5 +1,7 @@
 @import '@xterm/xterm/css/xterm.css';
 
+.office-view-links{position:fixed;bottom:14px;left:14px;z-index:15;display:flex;gap:4px;background:#162531e8;border:1px solid #7e9baa;border-radius:8px;padding:4px;font:12px system-ui}.office-view-links a{color:#d4e8f2;text-decoration:none;padding:7px 12px}.office-view-links a[aria-current=page]{background:#3b596e;border-radius:5px}
+
 :root {
   --ink: #2b2d42;
   --paper: #fffaf3;

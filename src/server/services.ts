@@ -64,6 +64,17 @@ function splitAddr(addr: string): { host: string; port: number } | null {
 
 async function listeners(): Promise<Listener[]> {
   const out: Listener[] = [];
+  if (process.platform === 'win32') {
+    const text = await run('netstat.exe', ['-ano', '-p', 'tcp']);
+    for (const line of text.split('\n')) {
+      const cols = line.trim().split(/\s+/);
+      if (cols[0] !== 'TCP' || cols[3] !== 'LISTENING') continue;
+      const addr = splitAddr(cols[1]);
+      const pid = Number(cols[4]);
+      if (addr && Number.isInteger(pid) && pid > 0) out.push({ pid, ...addr });
+    }
+    return out;
+  }
   if (process.platform === 'linux') {
     // `ss -p` shows the owning process for this user's sockets without root.
     const text = await run('ss', ['-H', '-l', '-t', '-n', '-p']);
@@ -91,6 +102,16 @@ async function listeners(): Promise<Listener[]> {
 
 async function processes(): Promise<Map<number, Proc>> {
   const procs = new Map<number, Proc>();
+  if (process.platform === 'win32') {
+    const text = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress']);
+    try {
+      const rows = JSON.parse(text);
+      for (const p of Array.isArray(rows) ? rows : [rows]) {
+        if (Number.isInteger(p?.ProcessId) && Number.isInteger(p.ParentProcessId)) procs.set(p.ProcessId, { ppid: p.ParentProcessId, args: typeof p.CommandLine === 'string' ? p.CommandLine : '' });
+      }
+    } catch { /* A failed process scan publishes no unverified service ownership. */ }
+    return procs;
+  }
   const text = await run('ps', ['-A', '-ww', '-o', 'pid=', '-o', 'ppid=', '-o', 'args=']);
   for (const line of text.split('\n')) {
     const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);

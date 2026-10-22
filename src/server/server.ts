@@ -755,7 +755,8 @@ export async function startServer(cfg: Config) {
       const session = auth.fromRequest(req);
       if (!session) {
         if (p.startsWith('/api/')) return send(res, 401, { error: 'Not logged in' });
-        res.writeHead(302, { location: '/login' }).end();
+        const next = p === '/pixel' || p === '/pixel.html' ? '/pixel' : p === '/lite' || p === '/lite.html' ? '/lite' : '';
+        res.writeHead(302, { location: next ? `/login?next=${next}` : '/login' }).end();
         return;
       }
       if (p === '/api/whoami') return send(res, 200, { ok: true, me: meOf(session.account?.id) });
@@ -879,6 +880,8 @@ export async function startServer(cfg: Config) {
         return send(res, 404, { error: 'Not found' });
       }
       if (p === '/' || p === '/index.html') return serveFile(res, path.join(publicDir, 'index.html'), false);
+      if (p === '/pixel' || p === '/pixel.html') return serveFile(res, path.join(publicDir, 'pixel.html'), false);
+      if (p === '/lite' || p === '/lite.html') return serveFile(res, path.join(publicDir, 'lite.html'), false);
       const file = publicFile(p);
       if (file) return serveFile(res, file, false);
       res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');

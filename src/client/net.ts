@@ -64,7 +64,8 @@ export class Net {
       try {
         const res = await fetch('/api/whoami', { cache: 'no-store' });
         if (res.status === 401) {
-          location.href = '/login';
+          const next = location.pathname.startsWith('/pixel') ? '/pixel' : location.pathname.startsWith('/lite') ? '/lite' : '';
+          location.href = next ? `/login?next=${next}` : '/login';
           return;
         }
       } catch {

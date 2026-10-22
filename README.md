@@ -9,6 +9,8 @@
 
 # 🏢 Agent Office
 
+**Pixel command center:** open `/pixel` for the interactive 2D office, `/lite` for a list view, or `/` for the original 3D office. [Pixel behavior and verification](docs/pixel-office-parity.md) records tested coverage and limitations. [Code layout](docs/code-layout.md) identifies the shared integration points.
+
 **A 3D office your team shares with its coding agents.**
 
 Sit **Claude Code**, **Codex** and **OpenCode** workers at desks, watch each one's terminal on the laptop in front of it,
