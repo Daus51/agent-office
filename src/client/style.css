@@ -1,6 +1,23 @@
 @import '@xterm/xterm/css/xterm.css';
 
-.office-view-links{position:fixed;bottom:14px;left:14px;z-index:15;display:flex;gap:4px;background:#162531e8;border:1px solid #7e9baa;border-radius:8px;padding:4px;font:12px system-ui}.office-view-links a{color:#d4e8f2;text-decoration:none;padding:7px 12px}.office-view-links a[aria-current=page]{background:#3b596e;border-radius:5px}
+.office-view-links {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 15;
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: var(--radius);
+  box-shadow: var(--shadow); font: 800 14px var(--font);
+}
+.office-view-links a {
+  display: flex; align-items: center; justify-content: center; min-height: 34px;
+  padding: 5px 14px; border-radius: 9px; color: var(--ink); text-decoration: none;
+}
+.office-view-links a:hover { background: var(--paper-2); }
+.office-view-links a[aria-current=page] { background: var(--accent); color: var(--accent-ink); }
+.office-view-links a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 1050px) {
+  .topbar { padding-top: 60px; }
+  #hud > .side { top: 132px; max-height: calc(100vh - 150px); }
+  #hud > :is(#toasts, #shares, .caffeine) { top: 132px; }
+}
 
 :root {
   --ink: #2b2d42;
